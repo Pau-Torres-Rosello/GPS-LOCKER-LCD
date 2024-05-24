@@ -1,0 +1,224 @@
+/*
+In this C++ code is a code that 
+uses an ESP32 with a NEO-6M GPS 
+module and a 20x4 I2C LCD.
+
+Pins used for connection
+
+I2C LCD connections:
+GND->GND
+VCC->5V
+SDA->21
+SCL->22
+
+GPS Satellite Antenna Connections:
+GND->GND
+TX->16
+RX->17
+VCC->3.3V
+*/
+
+//Library for I2C communication
+#include <Wire.h>
+
+//Library for LCD display control
+#include <LiquidCrystal_I2C.h>
+
+//Library for the connection of the different satellites and to give us the coordinates of our
+//of our coordinates
+#include <TinyGPS++.h>
+
+//Library for WIFI connection between the device and the mobile 
+// and the mobile phone
+#include <WiFi.h>
+
+//Library for web page operation
+#include <WebServer.h> //Library for web page operation.
+
+//PINES that are used to receive data from the NEO-6 antenna.
+//from the NEO-6M antenna
+
+#define RXD2 16
+#define TXD2 17
+HardwareSerial neogps(1);
+char dataCmd = 0;
+#define NMEA 0
+//Start GPS
+TinyGPSPlus gps;
+
+//Tell it what will be the WIFI / PASSWORD
+
+const char* ssid = “GPS-LOCKER”;
+const char* password = “12345678”;
+
+bool wifiConnected = false; // Flag to track the WiFi connection status.
+
+
+//Start the Server of the 
+//web page
+WebServer server(80);
+
+// Initialize the I2C LCD object
+LiquidCrystal_I2C lcd(0x27, 20, 4); // I2C address, 20 columns, 4 rows
+
+void setup() {
+  //We initialize the lcd
+  lcd.begin();
+  lcd.backlight(); // Turn on the backlight of the LCD screen
+  Serial.begin(115200);
+  
+  //Initialize satellite antenna
+  neogps.begin(9600, SERIAL_8N1, RXD2, TXD2);
+  
+  delay(2000);
+
+  // Connecting to the WiFi network
+  WiFi.begin(ssid, password);
+  Serial.println(“Connecting to the WiFi network...”);
+  lcd.print(“CONNECTING TO WIFI NETWORK WAIT...”);
+
+  //WIFI connection time checker
+  unsigned long timeStarttime = millis(); // Get current time
+  
+  // Wait up to 20 seconds for WIFI connection, If 
+  // No connection, nothing happens because the data will be given in the WEB
+  // It will be given on the WEB - LCD I2C
+  while (millis() - starttime < 20000) { 
+    if (WiFi.status() == WL_CONNECTED) {
+      wifiConnected = true;
+      break;
+    }
+    delay(1000);
+    Serial.println(“Connecting...”);
+  }
+    //Successful connection on the WIFI and gives 
+    //the IP of the server for the web
+  if (wifiConnected) {
+    Serial.println(“Connection successful”);
+    Serial.print("IP address assigned: ”);
+    Serial.println(WiFi.localIP());
+    lcd.clear();
+    lcd.setCursor(0, 0); // Set cursor to row 1, column 1
+    lcd.print("LOOK FOR IP IN ”);
+    lcd.setCursor(0, 1); // Set cursor in row 2, column 1
+    lcd.print(“WEB BROWSER”);
+    lcd.setCursor(0, 2); // Set cursor in row 3, column 1
+    lcd.print(WiFi.localIP());
+    delay(7000);
+
+  } else {
+    Serial.println(“Error: Could not connect to WiFi network”);
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("WE COULD NOT CONNECT TO THE INTERNET ”);   
+  }
+
+  // Web configuration for HTML5
+server.on("/", HTTP_GET, []() {
+    String content = "<html><head><title>ESP32 GPS</title>";
+    content += "<meta charset=\"utf-8\">"; // Setting the character encoding
+    content += "<script src=\"https://maps.googleapis.com/maps/api/js?key="AIzapyBRuR-RiLPl6CgRpv4iKj1o5qgfPneKENw\"></script>"";//KEY API GOOGLE //THE KEY DIDN'T WORK
+    content += "<script>function initMap() {var map = new google.maps.Map(document.getElementById('map'), {zoom: 70, center: {lat: ";//WEB DATA
+    content += String(gps.location.lat(), 40);
+    content += ", lng: ";
+    content += String(gps.location.lng(), 40);
+    content += "}, mapTypeId: 'satellite'});"; // Change the map type to satellite
+    content += "var marker = new google.maps.Marker({position: {lat: ";
+    content += String(gps.location.lat(), 40);
+    content += ", lng: ";
+    content += String(gps.location.lng(), 40);
+    content += "}, map: map});}</script>";
+    content += "<script>setTimeout(function(){ location.reload(); }, 15000);</script>"; // Reload the page every 15 seconds at our coordinates
+    content += "<style>";
+    content += "body {";
+    content += "background: -webkit-linear-gradient(90deg, #06071d,#06071d,#1a1f8d,#5a60e0,#d4d6fa);";//BACKGROUND COLOR
+    content += "background: linear-gradient(90deg, #06071d,#06071d,#1a1f8d,#5a60e0,#d4d6fa);";//BACKGROUND COLOR
+    content += "color: white;";
+    content += "text-align: center;";
+    content += "}"; // Gradient background and white text centered
+
+    //PARAMETERS FOR PRIVATE GOOGLE MAPS API MAPPING
+    content += "#map { height: 80vh; width: 100%; }"; // Style for the map that occupies 70% of the height of the screen and the entire width of the screen
+    content += "h1 { font-weight: bold; color: orange; }"; // Style to make text in headings bold and change color to orange
+    content += "p { font-weight: bold; }"; // Style to make text bold in paragraphs
+    content += "</style>";
+    content += "</head><body onload=\"initMap()\"><h1>LOCALIZACIÓN DE LA UBICACION TRACKER</h1>";
+    content += "<p>Latitud: ";
+    content += gps.location.lat(), 40;
+    content += " Km/h</p><p>Longitud: ";
+    content += gps.location.lng(), 40;
+    content += "</p><p>Velocidad: ";
+    content += gps.speed.kmph();
+    content += " Km/h</p><p>Satélites: ";
+    content += gps.satellites.value();
+    content += "</p><p>Altitud: ";
+    content += gps.altitude.meters();
+    content += " m</p><p>Fecha: ";
+    content += gps.date.year();
+    content += "/";
+    content += gps.date.month();
+    content += "/";
+    content += gps.date.day();
+    content += "</p>"; // Removed the time section
+    content += "<div id=\"map\"></div></body></html>";
+    server.send(200, "text/html", content);
+});
+
+void loop() {
+  //OPERATION ON THE SATELLITE
+  //TO RECEIVE AND SEND DATA
+  
+  if (NMEA) {
+    while (neogps.available()) {
+      datoCmd = (char)neogps.read();
+      Serial.print(datoCmd);
+    }
+  } else {
+    boolean dataNew = false
+    for (unsigned long start = millis(); millis() - start < 10000;) {
+      while (neogps.available()) {
+        if (gps.encode(neogps.read())) {
+          newData = true;
+        }
+      }
+    }
+
+    if (newData == true) {
+      newData = false;
+      Serial.println(gps.satellites.value());
+      Display_Serial();
+    }
+  }
+
+  // Handle requests from the web page.
+  server.handleClient();
+}
+
+//Function for I2C LCD control
+void Display_Serial(void) {
+  if (gps.location.isValid() == 1) {
+    // Display on the LCD 
+    //The different values “”
+    lcd.clear(); // Clear the screen
+    lcd.setCursor(0, 0);
+    lcd.print("LATITUDE: ”);
+    lcd.print(gps.location.lat(), 6);
+
+    lcd.setCursor(0, 1);
+    lcd.print("LONGITUDE: ”);
+    lcd.print(gps.location.lng(), 6);
+
+    lcd.setCursor(0, 2);
+    lcd.print("SPEED: ”);
+    lcd.print(gps.speed.kmph());
+
+    lcd.setCursor(0, 3);
+    lcd.print("SATELLITES: ”);
+    lcd.print(gps.satellites.value());
+  } else {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("WE DO NOT DETECT GPS ”);
+  }
+}
+
