@@ -100,7 +100,7 @@ void setup() {
 server.on("/", HTTP_GET, []() {
     String content = "<html><head><title>ESP32 GPS</title>";
     content += "<meta charset=\"utf-8\">"; // Configuración de la codificación de caracteres
-    content += "<script src=\"https://maps.googleapis.com/maps/api/js?key=AIzaSyBRuR-RiLPl6CgRpv4iKj1o5qgfPneKENw\"></script>";//KEY API GOOGLE
+    content += "<script src=\"https://maps.googleapis.com/maps/api/js?key=""></script>";//KEY API GOOGLE
     content += "<script>function initMap() {var map = new google.maps.Map(document.getElementById('map'), {zoom: 70, center: {lat: ";//DATOS DE LA WEB
     content += String(gps.location.lat(), 40);
     content += ", lng: ";
